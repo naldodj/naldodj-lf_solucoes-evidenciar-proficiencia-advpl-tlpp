@@ -1083,6 +1083,16 @@ GROUP BY
     cQuerySelect:=strTran(cQuerySelect,"SF1010",RetSQLName("SF1"))
     cQuerySelect:=strTran(cQuerySelect,"SD1010",RetSQLName("SD1"))
 
+    //Substitui o Filtro de Filial
+	//para maiores detalhes, acerca de TCGetDb, consulte https://tdn.totvs.com/display/tec/TCGetDB
+	if ("ORACLE"$Upper(TCGetDb()))
+        cQuerySelect:=strTran(;
+            cQuerySelect,;
+            "SA2.A2_FILIAL=(CASE SA2.A2_FILIAL WHEN ' ' THEN SA2.A2_FILIAL ELSE LEFT(SF1.F1_FILIAL,LEN(SA2.A2_FILIAL)) END)",;
+            "SA2.A2_FILIAL=(CASE WHEN SA2.A2_FILIAL=' ' THEN SA2.A2_FILIAL ELSE SUBSTR(SF1.F1_FILIAL,1,LENGTH(SA2.A2_FILIAL)) END)";
+        )
+    endif
+
     //para maiores detalhes, acerca de FWIsInCallStack, consulte https://tdn.totvs.com/display/public/framework/FWIsInCallStack
     if (FWIsInCallStack("LF.LOADCOMPANYDETAIL"))
         cQuerySelect:=strTran(cQuerySelect,"F1_FILIAL_DE",' ')

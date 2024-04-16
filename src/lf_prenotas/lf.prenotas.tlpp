@@ -1,0 +1,1589 @@
+/*******************************************************
+* Nome do Arquivo: [lf.prenotas.tlpp]
+* Descrição: [Demostrar os conhecimentos de Marinaldo de Jesus em AdvPL/TLPP/SQL,etc. junto a clientes da LF Soluções]
+*
+* Autor: [Marinaldo de Jesus]
+* Data: [15/04/2024]
+* Versão: [1.0]
+*
+* Este código está sujeito aos termos e condições da Licença Pública Geral Affero (AGPL).
+* Uma cópia da AGPL está disponível no arquivo LICENSE ou
+* através do link https://www.gnu.org/licenses/agpl-3.0.html.
+*
+* AGPL, [2024 Marinaldo de Jesus]
+*
+* De acordo com os termos da AGPL:
+* - Qualquer modificação feita neste código-fonte deve ser disponibilizada publicamente
+*   quando o software é executado como um serviço pela rede.
+* - A redistribuição deste código-fonte, com ou sem modificações, deve incluir o texto
+*   completo da licença.
+* - Este código é fornecido sem garantias ou condições de qualquer tipo, expressas ou
+*   implícitas.
+*
+* Para qualquer informação adicional ou dúvidas sobre a AGPL, entre em contato
+* através de [naldodj@outlook.com].
+*******************************************************/
+
+#include "shell.ch"
+#include "totvs.ch"
+#include "fwbrowse.ch"
+#include "parmtype.ch"
+#include "dbstruct.ch"
+#include "tlpp-core.th"
+
+/*Maiores detalhes, para namespace, em: https://tdn.totvs.com/display/tec/Namespace*/
+namespace lf
+using namespace lf
+
+//-------------------------------------------------------------------
+/*/{lf.prenotas.tlpp.doc} class PreNotas
+description Classe PreNotas para visualização de Pré-Notas não Classificadas
+@author LF :: Marinaldo de Jesus
+@since 15/04/2024
+@version 1.0
+/*/
+//-------------------------------------------------------------------
+class PreNotas
+
+    //-------------------------------------------------------------------
+    /*/{lf.prenotas.tlpp.doc} method BrowseNF
+    description método para consultas das Pré-Notas não Classificadas
+    /*/
+    //-------------------------------------------------------------------
+    static method BrowseNF(jParameters as json,lReload as logical) as variant
+
+    //-------------------------------------------------------------------
+    /*/{lf.prenotas.tlpp.doc} method LoadParameters
+    description método para carregar os parâmetos a serem utilizadas para
+                o Filtro do Browse
+    /*/
+    //-------------------------------------------------------------------
+    static method LoadParameters(jParameters as json) as logical
+
+    //-------------------------------------------------------------------
+    /*/{lf.prenotas.tlpp.doc} method LoadChartFactory
+    description método para carregar o Gráfico com as informações de Detalhes
+    /*/
+    //-------------------------------------------------------------------
+    static method LoadChartFactory(cTitle as character,cDetailAlias as character) as variant
+
+end class
+
+static method BrowseNF(jParameters,lReload) class PreNotas
+
+    //para maiores detalhes, acerca de FWGetArea, consulte https://tdn.totvs.com/display/public/framework/FwGetArea
+    local aArea:=FWGetArea() as array
+
+    local aTotalDbStruct:=Array(0) as array
+    local aDetailDbStruct:=Array(0) as array
+
+    local aDetailCustomFields,aTotalCustomFields as array
+    local aDetailFWMBrwFilter:=Array(0) as array
+    local aDetailFWMBrwColumn:=Array(0),aTotalFWMBrwColumn:=Array(0) as array
+    local aDetailFWMBQryIndex:=Array(0) as array
+    local aDetailFWMBrowseSeek:=Array(0) as array
+
+    local aFWGetDialogSizeCoors as array
+
+    local bDetailLDblClick,bTotalLDblClick as codeblock
+    local bDetalRefreshUpdate as codeblock
+
+    local cTitle,cBranchDetailTitle as character
+    local cMenuDef as character
+
+    local cDetailAlias,cTotalAlias as character
+
+    local cDetailTable as character
+
+    local cQueryInsert as character
+    local cQuerySelect as character
+    local cTotalQueryGetFields:="" as character
+    local cDetailQueryGetFields:="",cDetailQueryPutFields:="" as character
+
+    local dDataDe as date
+    local dDataAte as date
+
+    local lQueryInsert as logical
+
+    //para maiores detalhes, acerca de FWIsInCallStack, consulte https://tdn.totvs.com/display/public/framework/FWIsInCallStack
+    local lRedefineBottom:=(FWIsInCallStack("UF.EXECUTE").or.FwIsInCallStack("DNA.TECH.EXECUTE")) as logical
+
+    local nTotalField,nTotalFields as numeric
+    local nDetailField,nDetailFields as numeric
+
+    local nIndex:=1 as numeric
+    local nIndexes as numeric
+
+    local nTop,nLeft,nBottom,nRight as numeric
+
+    local oFWDefSize as object
+    local oPanelMain as object
+    local oFWDialogModal as object
+    local oDetailTPanel,oTotalTPanel as object
+    local oDetailFWMBrowse,oTotalFWMBrowse as object
+    local oFWTemporaryTable as object
+
+    paramtype 1 var jParameters as json
+    paramtype 2 var lReload as logical optional default .F.
+
+    //Tratamento para cCadastro
+    if ((type("cCadastro")!="C").or.(Empty(cCadastro)))
+        private cCadastro:=ProcName()
+    endif
+
+    cTitle:=if(Type("cCadastro")=="C",cCadastro,"Pré-Notas não Classificadas")
+
+    //Muda o Ponteiro do Cursor
+    //para maiores detalhes, acerca de CursorWait, consulte https://tdn.totvs.com/display/tec/CursorWait
+    CursorWait()
+
+    //Obtem os parametros para Filtro
+    dDataDe:=jParameters["Data.De"]
+    dDataAte:=jParameters["Data.Ate"]
+
+    /* Define os Campos dos Detalhes que irão aparecer no Browse
+        aDetailCustomFields[n][1]=>Nome do Campo
+        aDetailCustomFields[n][2]=>TamSX3=>{Size,Dec,Type}
+        aDetailCustomFields[n][3]=>Título do Campo
+        aDetailCustomFields[n][4]=>Picture do Campo
+        aDetailCustomFields[n][5]=>Expressão SQL do Campo
+    */
+    aDetailCustomFields:={;
+        {"F1_FILIAL",TamSX3("F1_FILIAL"),"Filial",nil,"SF1.F1_FILIAL"},;//F1_FILIAL
+        {"M0_FILIAL",{LEN(SM0->M0_FILIAL),0,"C"},"Desc.Filial","@!","SM0.M0_FILIAL"},;//M0_FILIAL
+        {"QTD_NOTAS",{6,0,"N"},"Qtde Notas",nil,"COUNT(*) AS QTD_NOTAS"},;//QTD_NOTAS
+        {"D1_TOTAL",TamSX3("D1_TOTAL"),"Valor Total das Notas",nil,"SUM(SD1.D1_TOTAL) AS D1_TOTAL"};//D1_TOTAL
+    }
+
+    //Processa cada Campo para a Elaboração do Browse, Indices e Filtro
+    nDetailFields:=Len(aDetailCustomFields)
+    for nDetailField:=1 to nDetailFields
+
+        //Carrega a Estrutura da Tabela Temporaria
+        aAdd(aDetailDbStruct,Array(DBS_ALEN))
+        aDetailDbStruct[nDetailField][DBS_NAME]:=aDetailCustomFields[nDetailField][1]
+        aDetailDbStruct[nDetailField][DBS_TYPE]:=aDetailCustomFields[nDetailField][2][3]
+        aDetailDbStruct[nDetailField][DBS_LEN]:=aDetailCustomFields[nDetailField][2][1]
+        aDetailDbStruct[nDetailField][DBS_DEC]:=aDetailCustomFields[nDetailField][2][2]
+
+        //Obtem o X3_TITULO do Campo
+        if (empty(aDetailCustomFields[nDetailField][3]))
+            aDetailCustomFields[nDetailField][3]:=GetSX3Cache(aDetailCustomFields[nDetailField][1],"X3_TITULO")
+        endif
+        //Obtem o X3_PICTURE do Campo
+        if (empty(aDetailCustomFields[nDetailField][4]))
+            aDetailCustomFields[nDetailField][4]:=GetSX3Cache(aDetailCustomFields[nDetailField][1],"X3_PICTURE")
+        endif
+
+        //Obtem os Campos para a Query
+        cDetailQueryPutFields+=aDetailCustomFields[nDetailField][1]
+        cDetailQueryGetFields+=aDetailCustomFields[nDetailField][5]
+        if (nDetailField<nDetailFields)
+            cDetailQueryPutFields+=","
+            cDetailQueryGetFields+=","
+        endif
+
+        if (aDetailDbStruct[nDetailField][DBS_TYPE]!="M");//Se o campo nao for Memo,adiciona ao Indice e aa pesquisa
+
+            //Define o Campo como Indice
+            aAdd(aDetailFWMBQryIndex,{aDetailDbStruct[nDetailField][DBS_NAME]})
+
+            //Define o Campo como Filtrável
+            aAdd(aDetailFWMBrwFilter,;
+                {;
+                    aDetailCustomFields[nDetailField][1],;//Campo
+                    aDetailCustomFields[nDetailField][3],;//Título
+                    aDetailDbStruct[nDetailField][DBS_TYPE],;//Tipo de dado
+                    aDetailDbStruct[nDetailField][DBS_LEN],;//Tamanho
+                    aDetailDbStruct[nDetailField][DBS_DEC],;//Decimal
+                    aDetailCustomFields[nDetailField][4];//Picture
+                };
+            )
+
+            //Habilita o campo para Pesquisa
+            aAdd(aDetailFWMBrowseSeek,;
+                {;
+                    aDetailCustomFields[nDetailField][3],;//[n,1] Título da pesquisa
+                    {;
+                        {;
+                            GetSX3Cache(aDetailCustomFields[nDetailField][1],"X3_F3"),;//[n,2,n,1] LookUp (F3)
+                            aDetailDbStruct[nDetailField][DBS_TYPE],;//[n,2,n,2] Tipo de dados
+                            aDetailDbStruct[nDetailField][DBS_LEN],;//[n,2,n,3] Tamanho
+                            aDetailDbStruct[nDetailField][DBS_DEC],;//[n,2,n,4] Decimal
+                            aDetailCustomFields[nDetailField][3],;//[n,2,n,5] Título do campo
+                            aDetailCustomFields[nDetailField][4],;//[n,2,n,6] Máscara
+                            nil;//[n,2,n,7] Nome Físico do campo (Opcional) é ajustado no programa
+                        };
+                    },;
+                    nIndex++,;//[n,3] Ordem da pesquisa
+                    .T.;//[n,4] Exibe na pesquisa
+                };
+            )
+
+        endif
+
+        //Monta as Colunas do Browse
+        //Maiores detalhes, para FWBrwColumn, em: https://tdn.totvs.com/display/public/framework/FWBrwColumn
+        aAdd(aDetailFWMBrwColumn,FWBrwColumn():New())
+
+        aDetailFWMBrwColumn[nDetailField]:SetData(&("{|oSelf|(cDetailAlias)->"+aDetailCustomFields[nDetailField][1]+"}"))
+
+        aDetailFWMBrwColumn[nDetailField]:SetTitle(aDetailCustomFields[nDetailField][3])
+        aDetailFWMBrwColumn[nDetailField]:SetPicture(aDetailCustomFields[nDetailField][4])
+        aDetailFWMBrwColumn[nDetailField]:SetSize(aDetailDbStruct[nDetailField][DBS_LEN])
+        aDetailFWMBrwColumn[nDetailField]:SetDecimal(aDetailDbStruct[nDetailField][DBS_DEC])
+
+    next nDetailField
+
+    //para maiores detalhes, acerca de FWTemporaryTable, consulte https://tdn.totvs.com/display/public/framework/FWTemporaryTable
+    oFWTemporaryTable:=FWTemporaryTable():New()
+    oFWTemporaryTable:SetFields(aDetailDbStruct)
+
+    nIndexes:=Len(aDetailFWMBQryIndex)
+    for nIndex:=1 to nIndexes
+        oFWTemporaryTable:AddIndex(StrZero(nIndex,3),aDetailFWMBQryIndex[nIndex])
+    next nIndex
+
+    oFWTemporaryTable:Create()
+
+    //Elabora a query para a obtenção dos registros
+    //para maiores detalhes, acerca de BEGINCONTENT...ENDCONTENT, consulte https://tdn.totvs.com/display/teces/BEGINCONTENT...ENDCONTENT
+    beginContent var cQuerySelect
+  SELECT cDetailQueryGetFields
+FROM
+    SF1010 SF1
+INNER JOIN
+    SYS_COMPANY SM0 ON (
+        SM0.D_E_L_E_T_=SF1.D_E_L_E_T_
+    AND SM0.M0_CODFIL=SF1.F1_FILIAL
+    )
+INNER JOIN
+    SD1010 SD1 ON (
+            SD1.D_E_L_E_T_=SF1.D_E_L_E_T_
+        AND SD1.D1_FILIAL=SF1.F1_FILIAL
+        AND SD1.D1_FORNECE=SF1.F1_FORNECE
+        AND SD1.D1_LOJA=SF1.F1_LOJA
+        AND SD1.D1_DOC=SF1.F1_DOC
+        AND SD1.D1_SERIE=SF1.F1_SERIE
+    )
+WHERE SF1.D_E_L_E_T_=' '
+  AND SF1.F1_FILIAL >= ' '
+  AND SF1.F1_DTDIGIT BETWEEN 'dDataDe' AND 'dDataAte'
+  AND SF1.F1_STATUS=' '
+GROUP BY
+     SF1.F1_FILIAL
+    ,SM0.M0_FILIAL
+    endContent
+
+    //Efetua a Substituição das constantes por Valores Dinamicos
+    cQuerySelect:=strTran(cQuerySelect,"cDetailQueryGetFields",cDetailQueryGetFields)
+    cQuerySelect:=strTran(cQuerySelect,"SF1010",RetSQLName("SF1"))
+    cQuerySelect:=strTran(cQuerySelect,"SD1010",RetSQLName("SD1"))
+    cQuerySelect:=strTran(cQuerySelect,"dDataDe",DToS(dDataDe))
+    cQuerySelect:=strTran(cQuerySelect,"dDataAte",DToS(dDataAte))
+
+    //Elabora a Query para o Insert na Tabela Temporária
+    cDetailTable:=oFWTemporaryTable:getRealName()
+    cQueryInsert:="INSERT INTO "+cDetailTable
+    cQueryInsert+=" ("+cDetailQueryPutFields+") "
+    cQueryInsert+=cQuerySelect
+
+    cDetailAlias:=oFWTemporaryTable:GetAlias()
+    dbSelectArea(cDetailAlias)
+
+    //para maiores detalhes, acerca de CursorArrow, consulte https://tdn.totvs.com/display/tec/CursorArrow
+    CursorArrow()
+    //Executa o Insert..
+    //Para maiores detalhes, acerca de FWMsgRun, consulte https://tdn.totvs.com/display/public/framework/FWMsgRun
+    //Para maiores detalhes, acerca de TCSQLExec,consulte https://tdn.totvs.com/display/tec/TCSQLExec
+    FWMsgRun(nil,{||lQueryInsert:=(TCSQLExec(cQueryInsert)>=0)},"Aguarde...","Obtendo dados no SGBD")
+    //Muda o Ponteiro do Cursor
+    CursorWait()
+
+    //..Se nao Deu erro,Mostra os Dados do Monitor
+    if (lQueryInsert)
+
+        /* Define os Campos dos Totais que irão aparecer no Browse
+            aTotalCustomFields[n][1]=>Nome do Campo
+            aTotalCustomFields[n][2]=>TamSX3=>{Size,Dec,Type}
+            aTotalCustomFields[n][3]=>Título do Campo
+            aTotalCustomFields[n][4]=>Picture do Campo
+            aTotalCustomFields[n][5]=>Expressão SQL do Campo
+        */
+        aTotalCustomFields:={;
+            {"MSG_TOTAL",{100+GetSX3Cache("F1_FILIAL","X3_TAMANHO"),0,"C"},"","@!","'TOTAL DE NOTAS NÃO CLASSIFICADAS' AS MSG_TOTAL"},;//MSG_TOTAL
+            {"QTD_NOTAS",{6,0,"N"},"Qtde Notas","999999","SUM(QTD_NOTAS) AS QTD_NOTAS"},;//QTD_NOTAS
+            {"D1_TOTAL",TamSX3("D1_TOTAL"),"Valor Total das Notas",nil,"SUM(D1_TOTAL) AS D1_TOTAL"};//D1_TOTAL
+        }
+
+        //Processa cada Campo para a Elaboração do Browse
+        nTotalFields:=Len(aTotalCustomFields)
+        for nTotalField:=1 to nTotalFields
+
+            //Carrega a Estrutura da Tabela Temporaria
+            aAdd(aTotalDbStruct,Array(DBS_ALEN))
+            aTotalDbStruct[nTotalField][DBS_NAME]:=aTotalCustomFields[nTotalField][1]
+            aTotalDbStruct[nTotalField][DBS_TYPE]:=aTotalCustomFields[nTotalField][2][3]
+            aTotalDbStruct[nTotalField][DBS_LEN]:=aTotalCustomFields[nTotalField][2][1]
+            aTotalDbStruct[nTotalField][DBS_DEC]:=aTotalCustomFields[nTotalField][2][2]
+
+            //Obtem o X3_TITULO do Campo
+            if (aTotalCustomFields[nTotalField][3]==nil)
+                aTotalCustomFields[nTotalField][3]:=GetSX3Cache(aTotalCustomFields[nTotalField][1],"X3_TITULO")
+            endif
+            //Obtem o X3_PICTURE do Campo
+            if (aTotalCustomFields[nTotalField][4]==nil)
+                aTotalCustomFields[nTotalField][4]:=GetSX3Cache(aTotalCustomFields[nTotalField][1],"X3_PICTURE")
+            endif
+
+            //Obtem os Campos para a Query
+            cTotalQueryGetFields+=aTotalCustomFields[nTotalField][5]
+            if (nTotalField<nTotalFields)
+                cTotalQueryGetFields+=","
+            endif
+
+            //Monta as Colunas do Browse
+            //Maiores detalhes, para FWBrwColumn, em: https://tdn.totvs.com/display/public/framework/FWBrwColumn
+            aAdd(aTotalFWMBrwColumn,FWBrwColumn():New())
+
+            aTotalFWMBrwColumn[nTotalField]:SetData(&("{|oSelf|(cTotalAlias)->"+aTotalCustomFields[nTotalField][1]+"}"))
+
+            aTotalFWMBrwColumn[nTotalField]:SetTitle(aTotalCustomFields[nTotalField][3])
+            aTotalFWMBrwColumn[nTotalField]:SetPicture(aTotalCustomFields[nTotalField][4])
+            aTotalFWMBrwColumn[nTotalField]:SetSize(aTotalDbStruct[nTotalField][DBS_LEN])
+            aTotalFWMBrwColumn[nTotalField]:SetDecimal(aTotalDbStruct[nTotalField][DBS_DEC])
+
+        next nTotalField
+
+        //https://tdn.totvs.com/display/public/framework/Desenvolvendo+queries+no+Protheus
+        cTotalAlias:=getNextAlias()
+        cDetailTable:="%"+cDetailTable+"%"
+        cTotalQueryGetFields:="%"+cTotalQueryGetFields+"%"
+        beginSQL alias cTotalAlias
+            SELECT %exp:cTotalQueryGetFields%
+              FROM %exp:cDetailTable%
+        endSQL
+
+        //https://tdn.totvs.com/display/public/framework/FWGetDialogSize
+        aFWGetDialogSizeCoors:=FWGetDialogSize()
+
+        //Define o Dialog
+        //Para maiores detalhes, acerca de FWDialogModal, consulte https://tdn.totvs.com/display/public/framework/FwDialogModal
+        oFWDialogModal:=FWDialogModal():New()
+        oFWDialogModal:SetTitle(cTitle)
+        oFWDialogModal:SetEscClose(.F.)
+        oFWDialogModal:SetSize(aFWGetDialogSizeCoors[3]/(2+if(lRedefineBottom,0/*.15*/,0)),aFWGetDialogSizeCoors[4]/2)
+        oFWDialogModal:CreateDialog()
+        oFWDialogModal:EnableFormBar(.T.)
+        oFWDialogModal:CreateFormBar()
+
+        //Libera os Arrays da memória
+        //Obs.: Função não documentada no TDS
+        FWFreeArray(@aFWGetDialogSizeCoors)
+
+        //Obtem o Panel vinculado ao Dialog
+        oPanelMain:=oFWDialogModal:GetPanelMain()
+
+        //Muda o Ponteiro do Cursor
+        CursorArrow()
+
+        //Obtem as Coordenadas da janela para a Distribuição das Grids Detalhes e Totais
+        //Para maiores detalhes, acerca de FWDefSize, consulte https://tdn.totvs.com/display/public/framework/FWDefSize
+        oFWDefSize:=FWDefSize():New(.F.,.F.)
+        oFWDefSize:AddObject("GRID_DETAIL",100,80,.T.,.T.)
+        oFWDefSize:AddObject("GRID_TOTAL",100,20,.T.,.T.)
+        oFWDefSize:lLateral:=.F.
+        oFWDefSize:lProp:=.T.
+        oFWDefSize:Process()
+
+        **********************************************************************************
+        *Detalhes
+        **********************************************************************************
+        nTop:=oFWDefSize:GetDimension("GRID_DETAIL","LININI")
+        nLeft:=oFWDefSize:GetDimension("GRID_DETAIL","COLINI")
+        nBottom:=oFWDefSize:GetDimension("GRID_DETAIL","LINEND")
+        nRight:=oFWDefSize:GetDimension("GRID_DETAIL","COLEND")
+        nRight-=5
+
+        //para maiores detalhes, acerca de TPanel, consulte https://tdn.totvs.com/display/tec/Construtor+TPanel%3ANew
+        oDetailTPanel:=TPanel():New(;
+            nTop/*[nRow]*/,;
+            nLeft/*[nCol]*/,;
+            /*[cText]*/,;
+            oPanelMain/*[oWnd]*/,;
+            /*[oFont]*/,;
+            /*[lCentered]*/,;
+            /*[uParam7]*/,;
+            /*[nClrText]*/,;
+            /*[nClrBack]*/,;
+            nRight/*[nWidth]*/,;
+            nBottom/*[nHeight]*/,;
+            /*[lLowered]*/,;
+            /*[lRaised]*/;
+        )
+
+        //Define o Browse de Detalhes
+        //Para maiores detalhes, acerca de FWMBrowse, consulte https://tdn.totvs.com/pages/releaseview.action?pageId=62390842
+        (cDetailAlias)->(dbSetOrder(1))
+        (cDetailAlias)->(dbGoTop())
+
+        cMenuDef:="LF.PRENOTAS.MVC"
+
+        oDetailFWMBrowse:=FWMBrowse():New()
+        oDetailFWMBrowse:SetDataTable()
+        oDetailFWMBrowse:SetTemporary(.T.)
+        oDetailFWMBrowse:SetAlias(cDetailAlias)
+        oDetailFWMBrowse:SetMenuDef(cMenuDef)
+        oDetailFWMBrowse:SetColumns(aDetailFWMBrwColumn)
+        oDetailFWMBrowse:SetQueryIndex(aDetailFWMBQryIndex)
+        oDetailFWMBrowse:SetSeek(.T.,aDetailFWMBrowseSeek)
+        oDetailFWMBrowse:SetUseFilter(.T.)
+        oDetailFWMBrowse:SetUseCaseFilter(.T.)
+        oDetailFWMBrowse:SetFieldFilter(aDetailFWMBrwFilter)
+        oDetailFWMBrowse:DisableDetails()
+
+        cBranchDetailTitle:=if(Type("cCadastro")=="C",cCadastro,"Pré-Notas não Classificadas")
+        cBranchDetailTitle+=" :: Detalhes da Filial"
+        bDetailLDblClick:={||LoadBranchDetail(cDetailAlias,(cDetailAlias)->(RecNo()),cBranchDetailTitle)}
+        oDetailFWMBrowse:SetDoubleClick(bDetailLDblClick)
+
+        bDetalRefreshUpdate:={||lReload:=.T.,oFWDialogModal:DeActivate(.T./*lFreeChildren*/)}
+        oDetailFWMBrowse:AddButton("Atualizar",bDetalRefreshUpdate,nil,2)
+        oDetailFWMBrowse:AddButton("Parâmetros",{||lf.PreNotas():LoadParameters(@jParameters),lReload:=.T.,oFWDialogModal:DeActivate(.T./*lFreeChildren*/)},nil,2)
+        oDetailFWMBrowse:AddButton("Fechar",{||oFWDialogModal:DeActivate(.T./*lFreeChildren*/)},nil,2)
+
+        oDetailFWMBrowse:AddButton("Detalhes",bDetailLDblClick,nil,1,0,.F.)
+        oDetailFWMBrowse:AddButton("Gráfico",{||lf.PreNotas():LoadChartFactory(cTitle,cDetailAlias)},nil,1,0,.F.)
+
+        **********************************************************************************
+        *Totais
+        **********************************************************************************
+        nTop:=oFWDefSize:GetDimension("GRID_TOTAL","LININI")
+        nLeft:=oFWDefSize:GetDimension("GRID_TOTAL","COLINI")
+        nBottom:=oFWDefSize:GetDimension("GRID_TOTAL","LINEND")
+        nRight:=oFWDefSize:GetDimension("GRID_TOTAL","COLEND")
+        nRight-=5
+
+        //para maiores detalhes, acerca de TPanel, consulte https://tdn.totvs.com/display/tec/Construtor+TPanel%3ANew
+        oTotalTPanel:=TPanel():New(;
+            nTop/*[nRow]*/,;
+            nLeft/*[nCol]*/,;
+            /*[cText]*/,;
+            oPanelMain/*[oWnd]*/,;
+            /*[oFont]*/,;
+            /*[lCentered]*/,;
+            /*[uParam7]*/,;
+            /*[nClrText]*/,;
+            /*[nClrBack]*/,;
+            nRight/*[nWidth]*/,;
+            nBottom/*[nHeight]*/,;
+            /*[lLowered]*/,;
+            /*[lRaised]*/;
+        )
+
+        //Define o Browse de Totais
+        //Para maiores detalhes, acerca de FWMBrowse, consulte https://tdn.totvs.com/pages/releaseview.action?pageId=62390842
+        oTotalFWMBrowse:=FWMBrowse():New()
+        oTotalFWMBrowse:SetDataTable()
+        oTotalFWMBrowse:SetTemporary(.T.)
+        oTotalFWMBrowse:SetAlias(cTotalAlias)
+        oTotalFWMBrowse:SetColumns(aTotalFWMBrwColumn)
+        oTotalFWMBrowse:DisableSeek()
+        oTotalFWMBrowse:DisableConfig()
+        oTotalFWMBrowse:DisableFilter()
+        oTotalFWMBrowse:DisableLocate()
+        oTotalFWMBrowse:DisableReport()
+        oTotalFWMBrowse:DisableDetails()
+        oTotalFWMBrowse:DisableSaveConfig()
+
+        cBranchTotalTitle:=if(Type("cCadastro")=="C",cCadastro,"Pré-Notas não Classificadas")
+        cBranchTotalTitle+=" :: Totais por Filial"
+        bTotalLDblClick:={||LoadCompanyDetail(cDetailAlias,(cDetailAlias)->(RecNo()),cTitle)}
+        oTotalFWMBrowse:SetDoubleClick(bTotalLDblClick)
+
+        **********************************************************************************
+        *Ativação dos Browsers
+        **********************************************************************************
+        //Seta oPanelMain como Owner do Browse de Detalhes
+        oDetailFWMBrowse:SetOwner(oDetailTPanel)
+
+        //Seta oPanelMain como Owner do Browse de Totais
+        oTotalFWMBrowse:SetOwner(oTotalTPanel)
+
+        //Aguarda a Preparação da Interface do Browse
+        FWMsgRun(nil,{||oDetailFWMBrowse:Activate(),oTotalFWMBrowse:Activate()},cTitle,"Ativando os Browses...")
+
+        //Ativa a Janela do Browse
+        oFWDialogModal:Activate()
+
+        //Encerra o Browse ao Sair do Activate do Dialog
+        oDetailFWMBrowse:DeActivate()
+
+        //Libera os objetos usados
+        aEval(aDetailFWMBrwColumn,{|o|FreeObj(@o)})
+        oDetailFWMBrowse:Destroy()
+
+        //Encerra o Browse ao Sair do Activate do Dialog
+        oTotalFWMBrowse:DeActivate()
+
+        //Libera os objetos usados
+        aEval(aTotalFWMBrwColumn,{|o|FreeObj(@o)})
+        oTotalFWMBrowse:Destroy()
+
+        //para maiores detalhes, acerca de FreeObj, consulte https://tdn.totvs.com/display/tec/FreeObj
+        FreeObj(@oFWDefSize)
+        FreeObj(@oPanelMain)
+        FreeObj(@oTotalTPanel)
+        FreeObj(@oDetailTPanel)
+        FreeObj(@oFWDialogModal)
+        FreeObj(@oTotalFWMBrowse)
+        FreeObj(@oDetailFWMBrowse)
+
+    else
+
+        //Na ocorrência de Erro, mostra a informação ao usuário
+        EecView(TCSQLError(),cTitle)
+
+    endif
+
+    //Encerra a Tabela Temporária
+    oFWTemporaryTable:delete()
+    FreeObj(@oFWTemporaryTable)
+
+    //Restaura os Ponteiros de Entrada
+    //para maiores detalhes, acerca de FWRestArea, consulte https://tdn.totvs.com/display/public/framework/FwRestArea
+    FWRestArea(@aArea)
+
+    //Libera os Arrays da memória
+    //Obs.: Função não documentada no TDS
+    FWFreeArray(@aArea)
+    FWFreeArray(@aTotalDbStruct)
+    FWFreeArray(@aDetailDbStruct)
+    FWFreeArray(@aTotalCustomFields)
+    FWFreeArray(@aDetailFWMBrwFilter)
+    FWFreeArray(@aDetailCustomFields)
+    FWFreeArray(@aDetailFWMBrwColumn)
+    FWFreeArray(@aDetailFWMBrowseSeek)
+    FWFreeArray(@aDetailFWMBQryIndex)
+
+    //Exclui todas classes de interface da thread.
+    //para maiores detalhes, acerca de DelClassIntf, consulte https://tdn.totvs.com/display/tec/DelClassIntf
+    DelClassIntf()
+
+    //Muda o Ponteiro do Cursor
+    CursorArrow()
+
+    if (lReload)
+        //Remonta o Browse
+        u_LFShwPNT(@jParameters,@lReload)
+    endif
+
+return(nil)
+
+static method LoadParameters(jParameters) class PreNotas
+
+    local aPBoxPrm:=Array(0) as array
+    local aPBoxRet as array
+
+    local cParamTit:="Visualizar" as character
+
+    local dDataDe as date
+    local dDataAte as date
+
+    local nPBox as numeric
+
+    local nF1_DTDIGIT:=GetSx3Cache("F1_DTDIGIT","X3_TAMANHO") as numeric
+
+    paramtype 1 var jParameters as json optional default JSONObject():New()
+
+    if (valtype(jParameters)=="J")
+        if (jParameters:HasProperty("Data.De"))
+            dDataDe:=jParameters["Data.De"]
+        else
+            dDataDe:=MsDate()
+        endif
+        if (jParameters:HasProperty("Data.Ate"))
+            dDataAte:=jParameters["Data.Ate"]
+        else
+            dDataAte:=MsDate()
+        endif
+    else
+        jParameters:=JSONObject():New()
+    endif
+
+    aAdd(aPBoxPrm,Array(9))
+    nPBox:=Len(aPBoxPrm)
+    //01----------------------------------------------------------------------------------------------
+    aPBoxPrm[nPBox][1]:=1//[1]:1 - MsGet
+    aPBoxPrm[nPBox][2]:="Data.De"//[2]:Descricao
+    aPBoxPrm[nPBox][3]:=dDataDe//[3]:String contendo o inicializador do campo
+    aPBoxPrm[nPBox][4]:="@D"//[4]:String contendo a Picture do campo
+    aPBoxPrm[nPBox][5]:="AllWaysTrue()"//[5]:String contendo a validacao
+    aPBoxPrm[nPBox][6]:=""//[6]:Consulta F3
+    aPBoxPrm[nPBox][7]:="AllWaysTrue()"//[7]:String contendo a validacao When
+    aPBoxPrm[nPBox][8]:=(CalcFieldSize("D",nF1_DTDIGIT,0,aPBoxPrm[nPBox][4],aPBoxPrm[nPBox][2])+20)//[8]:Tamanho do MsGet
+    aPBoxPrm[nPBox][9]:=.F.//[9]:Flag .T./.F. Parametro Obrigatorio ?
+
+    aAdd(aPBoxPrm,Array(9))
+    nPBox:=Len(aPBoxPrm)
+    //02----------------------------------------------------------------------------------------------
+    aPBoxPrm[nPBox][1]:=1//[1]:1 - MsGet
+    aPBoxPrm[nPBox][2]:="Data.Ate"//[2]:Descricao
+    aPBoxPrm[nPBox][3]:=dDataAte//[3]:String contendo o inicializador do campo
+    aPBoxPrm[nPBox][4]:="@D"//[4]:String contendo a Picture do campo
+    aPBoxPrm[nPBox][5]:="NaoVazio()"//[5]:String contendo a validacao
+    aPBoxPrm[nPBox][6]:=""//[6]:Consulta F3
+    aPBoxPrm[nPBox][7]:="AllWaysTrue()"//[7]:String contendo a validacao When
+    aPBoxPrm[nPBox][8]:=(CalcFieldSize("D",nF1_DTDIGIT,0,aPBoxPrm[nPBox][4],aPBoxPrm[nPBox][2])+20)//[8]:Tamanho do MsGet
+    aPBoxPrm[nPBox][9]:=.T.//[9]:Flag .T./.F. Parametro Obrigatorio ?
+
+    saveInter()
+        //Função Não Documentada: ParamBox
+        //Elabora interface para seleção das opções de Filtro (semelhante à função Pergunte e sem a necessidade de popular a tabela SX1)
+        lParamBox:=ParamBox(@aPBoxPrm,@cParamTit,@aPBoxRet,/*bOk*/,/*aButtons*/,.T./*lCentered*/,/*nPosx*/,/*nPosy*/,/*oDlgWizard*/,/*cLoad*/,.T./*lCanSave*/,.T./*lUserSave*/)
+    restInter()
+
+    if (lParamBox)
+        for nPBox:=1 To Len(aPBoxPrm)
+            jParameters[aPBoxPrm[nPBox][2]]:=aPBoxRet[nPBox]
+        next nPBox
+    else
+        for nPBox:=1 To Len(aPBoxPrm)
+            if ("Data"$aPBoxPrm[nPBox][2])
+                jParameters[aPBoxPrm[nPBox][2]]:=MsDate()
+            endif
+        next nPBox
+    endif
+
+    //Libera os Arrays da memória
+    //Obs.: Função não documentada no TDS
+    FWFreeArray(@aPBoxPrm)
+    FWFreeArray(@aPBoxRet)
+
+return(jParameters)
+
+static method LoadChartFactory(cTitle,cDetailAlias) class PreNotas
+
+    local aArea as array
+    local aAreaDetail as array
+
+    local aFWGetDialogSizeCoors as array
+
+    local cChatFactoryTitle as character
+
+    //para maiores detalhes, acerca de FWIsInCallStack, consulte https://tdn.totvs.com/display/public/framework/FWIsInCallStack
+    local lRedefineBottom:=(FWIsInCallStack("UF.EXECUTE").or.FwIsInCallStack("DNA.TECH.EXECUTE")) as logical
+
+    local nOptionChart as numeric
+
+    local oFWDialogModal as object
+    local oFWChartFactory,oFWChartFactoryInstance as object
+    local oFWChartFactoryTPanel as object
+
+    paramtype 1 var cTitle as character
+    paramtype 2 var cDetailAlias as character
+
+    //Define o tipo de informação a ser mostrada no Gráfico
+    nOptionChart:=LoadChartFactoryOption()
+    if (nOptionChart==(-1))
+        return(nil)
+    elseif (nOptionChart==(1))
+        cChatFactoryTitle:="Valor de "
+    elseif (nOptionChart==(2))
+        cChatFactoryTitle:="Quantidade de "
+    endif
+
+    cChatFactoryTitle+=cTitle
+
+    aArea:=FWGetArea()
+    aAreaDetail:=(cDetailAlias)->(FWGetArea())
+
+    //https://tdn.totvs.com/display/public/framework/FWGetDialogSize
+    aFWGetDialogSizeCoors:=FWGetDialogSize()
+
+    //Define o Dialog
+    //Para maiores detalhes, acerca de FWDialogModal, consulte https://tdn.totvs.com/display/public/framework/FwDialogModal
+    oFWDialogModal:=FWDialogModal():New()
+    oFWDialogModal:SetTitle(cTitle)
+    oFWDialogModal:SetEscClose(.F.)
+    oFWDialogModal:SetSize(aFWGetDialogSizeCoors[3]/(2+if(lRedefineBottom,0/*.15*/,0)),aFWGetDialogSizeCoors[4]/2)
+    oFWDialogModal:CreateDialog()
+    oFWDialogModal:EnableFormBar(.F.)
+
+    //Libera os Arrays da memória
+    //Obs.: Função não documentada no TDS
+    FWFreeArray(@aFWGetDialogSizeCoors)
+
+    //Obtem o Panel vinculado ao Dialog
+    oFWChartFactoryTPanel:=oFWDialogModal:GetPanelMain()
+
+    //para maiores detalhes, acerca de FWChartFactory, consulte https://tdn.totvs.com/display/public/framework/FwChartFactory
+    oFWChartFactory:=FWChartFactory():New()
+
+    //Define o tipo do gráfico
+    //-----------------------------------------
+    // Opções disponiveis
+    // RADARCHART
+    // FUNNELCHART
+    // COLUMNCHART
+    // NEWPIECHART
+    // NEWLINECHART
+    //-----------------------------------------
+    oFWChartFactory:SetChartDefault(NEWPIECHART)
+
+    //Obtem a Instância do gráfico
+    //-----------------------------------------
+    // Opções disponiveis
+    // BARCOMPCHART
+    // LINECHART
+    // PIECHART
+    // ...
+    //-----------------------------------------
+    oFWChartFactoryInstance:=oFWChartFactory:getInstance(PIECHART)
+    oFWChartFactoryInstance:Init(oFWChartFactoryTPanel,.T.,.T.)
+    //----------------------------------------------
+    //Titulo
+    //opções de alinhamento do titulo:
+    //CONTROL_ALIGN_RIGHT | CONTROL_ALIGN_LEFT | CONTROL_ALIGN_CENTER
+    //----------------------------------------------
+    oFWChartFactoryInstance:setTitle(cChatFactoryTitle,CONTROL_ALIGN_CENTER)
+
+    //----------------------------------------------
+    //Adiciona Legenda
+    //opções de alinhamento da legenda:
+    //CONTROL_ALIGN_RIGHT | CONTROL_ALIGN_LEFT |
+    //CONTROL_ALIGN_TOP | CONTROL_ALIGN_BOTTOM
+    //----------------------------------------------
+    oFWChartFactoryInstance:SetLegend(CONTROL_ALIGN_BOTTOM)
+
+    //Defice as cores de forma Randomica
+    oFWChartFactoryInstance:oFWChartColor:SetColor("RANDOM")
+
+    (cDetailAlias)->(dbGoTop())
+    while ((cDetailAlias)->(!eof()))
+        if (nOptionChart==1)
+            (cDetailAlias)->(oFWChartFactoryInstance:addSerie(F1_FILIAL+" "+allTrim(M0_FILIAL),D1_TOTAL))
+        else
+            (cDetailAlias)->(oFWChartFactoryInstance:addSerie(F1_FILIAL+" "+allTrim(M0_FILIAL),QTD_NOTAS))
+        endif
+        (cDetailAlias)->(dbSkip())
+    end while
+
+    if (nOptionChart==1)
+        //----------------------------------------------
+        //Picture
+        //----------------------------------------------
+        oFWChartFactoryInstance:setPicture("@E 999,999,999.99")
+        //----------------------------------------------
+        //Mascara
+        //----------------------------------------------
+        oFWChartFactoryInstance:setMask("R$ *@*")
+    else
+        //----------------------------------------------
+        //Picture
+        //----------------------------------------------
+        oFWChartFactoryInstance:setPicture("999999")
+    endif
+
+    //Constrói o gráfico
+    oFWChartFactoryInstance:Build()
+
+    //Ativa a Janela do Gráfico
+    oFWDialogModal:Activate()
+
+    //Desativa a Janela do Gráfico
+    oFWDialogModal:DeActivate(.T./*lFreeChildren*/)
+
+    //para maiores detalhes, acerca de FreeObj, consulte https://tdn.totvs.com/display/tec/FreeObj
+    FreeObj(@oFWChartFactoryInstance)
+    FreeObj(@oFWChartFactory)
+    FreeObj(@oFWChartFactoryTPanel)
+    FreeObj(@oFWDialogModal)
+
+    //Exclui todas classes de interface da thread.
+    //para maiores detalhes, acerca de DelClassIntf, consulte https://tdn.totvs.com/display/tec/DelClassIntf
+    DelClassIntf()
+
+    //para maiores detalhes, acerca de FWRestArea, consulte https://tdn.totvs.com/display/public/framework/FwRestArea
+    FWRestArea(aAreaDetail)
+    FWRestArea(aArea)
+
+    //Libera os Arrays da memória
+    //Obs.: Função não documentada no TDS
+    FWFreeArray(@aAreaDetail)
+    FWFreeArray(@aArea)
+
+return(nil)
+
+//-------------------------------------------------------------------
+/*/{lf.prenotas.tlpp.doc} function LoadChartFactoryOption
+description Interface para escolha do tipo de informação a ser protada no Gráfico
+@author LF :: Marinaldo de Jesus
+@since 15/04/2024
+@version 1.0
+/*/
+//-------------------------------------------------------------------
+static function LoadChartFactoryOption() as numeric
+
+    local aPBoxPrm:=Array(0) as array
+    local aPBoxRet:=Array(0) as array
+
+    local aOptions:={"Total","Quantidade"} as array
+
+    local cPBoxTit:=OemToAnsi("Selecione a opção para a Geração do Gráfico") as character
+
+    local lParamBox:=.F. as logical
+
+    local nPBox as numeric
+	local nChoice:=(-1) as numeric
+
+    saveInter()
+
+        aAdd(aPBoxPrm,Array(7))
+        nPBox:=Len(aPBoxPrm)
+        //12----------------------------------------------------------------------------------------------
+        aPBoxPrm[nPBox][1]:=3 // Tipo 3 -> Radio
+        aPBoxPrm[nPBox][2]:="Tipo de Gráfico" //[2]:Descricao
+        aPBoxPrm[nPBox][3]:=1 //[3]:Numerico contendo a opcao inicial do Radio
+        aPBoxPrm[nPBox][4]:=aOptions //[4]:Array contendo as opcoes do Radio
+        aPBoxPrm[nPBox][5]:=100 //[5]:Tamanho do Radio
+        aPBoxPrm[nPBox][6]:="AllWaysTrue()" //[6]:Validacao
+        aPBoxPrm[nPBox][7]:=.F. //[9]:Flag .T./.F. Parametro Obrigatorio ?
+
+        while (!(lParamBox:=ParamBox(@aPBoxPrm,@cPBoxTit,@aPBoxRet,NIL,NIL,.T.,NIL,NIL,NIL,NIL,.T.,.T.)))
+            lParamBox:=MsgYesNo("Deseja Abortar a Geração?","Atenção!")
+            if (lParamBox)
+                lParamBox:=.F.
+                exit
+            endif
+        end while
+
+        if (lParamBox)
+            for nPBox:=1 To Len(aPBoxPrm)
+                nChoice:=aPBoxRet[nPBox]
+            next nPBox
+        endif
+
+    restInter()
+
+    //Libera os Arrays da memória
+    //Obs.: Função não documentada no TDS
+    FWFreeArray(@aOptions)
+    FWFreeArray(@aPBoxRet)
+    FWFreeArray(@aPBoxPrm)
+
+return(nChoice)
+
+static function LoadBranchDetail(cDetailAlias as character,nDetailRecNo as numeric,cTitle as character) as variant
+
+    //para maiores detalhes, acerca de FWGetArea, consulte https://tdn.totvs.com/display/public/framework/FwGetArea
+    local aArea:=FWGetArea() as array
+
+    local aTotalDbStruct:=Array(0) as array
+    local aDetailDbStruct:=Array(0) as array
+
+    local aDetailCustomFields,aTotalCustomFields as array
+    local aDetailFWMBrwFilter:=Array(0) as array
+    local aDetailFWMBrwColumn:=Array(0),aTotalFWMBrwColumn:=Array(0) as array
+    local aDetailFWMBQryIndex:=Array(0) as array
+    local aDetailFWMBrowseSeek:=Array(0) as array
+
+    local aFWGetDialogSizeCoors as array
+
+    local bDetailLDblClick,bTotalLDblClick as codeblock
+    local bDetalRefreshUpdate as codeblock
+
+    local cMenuDef as character
+
+    local cBranchDetailAlias,cTotalAlias as character
+
+    local cBranchDetailTable as character
+
+    local cQueryInsert as character
+    local cQuerySelect as character
+    local cTotalQueryGetFields:="" as character
+    local cDetailQueryGetFields:="",cDetailQueryPutFields:="" as character
+
+    local lReload:=.F. as logical
+    local lQueryInsert as logical
+
+    //para maiores detalhes, acerca de FWIsInCallStack, consulte https://tdn.totvs.com/display/public/framework/FWIsInCallStack
+    local lRedefineBottom:=(FWIsInCallStack("UF.EXECUTE").or.FwIsInCallStack("DNA.TECH.EXECUTE")) as logical
+
+    local nTotalField,nTotalFields as numeric
+    local nDetailField,nDetailFields as numeric
+
+    local nIndex:=1 as numeric
+    local nIndexes as numeric
+
+    local nTop,nLeft,nBottom,nRight as numeric
+
+    local oFWDefSize as object
+    local oPanelMain as object
+    local oFWDialogModal as object
+    local oDetailTPanel,oTotalTPanel as object
+    local oDetailFWMBrowse,oTotalFWMBrowse as object
+    local oFWTemporaryTable as object
+
+    //MsGoto, Semelhante a dbGoTo. Mas verifica se o registro já está posicionado antes de movimentar o Ponteiro.
+    (cDetailAlias)->(MsGoTo(nDetailRecNo))
+
+    //Muda o Ponteiro do Cursor
+    //para maiores detalhes, acerca de CursorWait, consulte https://tdn.totvs.com/display/tec/CursorWait
+    CursorWait()
+
+    /* Define os Campos dos Detalhes que irão aparecer no Browse
+        aDetailCustomFields[n][1]=>Nome do Campo
+        aDetailCustomFields[n][2]=>TamSX3=>{Size,Dec,Type}
+        aDetailCustomFields[n][3]=>Título do Campo
+        aDetailCustomFields[n][4]=>Picture do Campo
+        aDetailCustomFields[n][5]=>Expressão SQL do Campo
+    */
+    aDetailCustomFields:={;
+        {"F1_FILIAL",TamSX3("F1_FILIAL"),"Filial",nil,"SF1.F1_FILIAL"},;//F1_FILIAL
+        {"F1_FORNECE",TamSX3("F1_FORNECE"),nil,nil,"SF1.F1_FORNECE"},;//F1_FORNECE
+        {"F1_LOJA",TamSX3("F1_LOJA"),nil,nil,"SF1.F1_LOJA"},;//F1_LOJA
+        {"A2_NOME",TamSX3("A2_NOME"),nil,nil,"SA2.A2_NOME"},;//A2_NOME
+        {"F1_DOC",TamSX3("F1_DOC"),nil,nil,"SF1.F1_DOC"},;//F1_DOC
+        {"F1_SERIE",TamSX3("F1_SERIE"),nil,nil,"SF1.F1_SERIE"},;//F1_SERIE
+        {"F1_DTDIGIT",TamSX3("F1_DTDIGIT"),nil,nil,"SF1.F1_DTDIGIT"},;//F1_DTDIGIT
+        {"F1_EMISSAO",TamSX3("F1_EMISSAO"),nil,nil,"SF1.F1_EMISSAO"},;//F1_EMISSAO
+        {"D1_TOTAL",TamSX3("D1_TOTAL"),"Valor Documento",nil,"SUM(SD1.D1_TOTAL) AS D1_TOTAL"};//D1_TOTAL
+    }
+
+    //Processa cada Campo para a Elaboração do Browse, Indices e Filtro
+    nDetailFields:=Len(aDetailCustomFields)
+    for nDetailField:=1 to nDetailFields
+
+        //Carrega a Estrutura da Tabela Temporaria
+        aAdd(aDetailDbStruct,Array(DBS_ALEN))
+        aDetailDbStruct[nDetailField][DBS_NAME]:=aDetailCustomFields[nDetailField][1]
+        aDetailDbStruct[nDetailField][DBS_TYPE]:=aDetailCustomFields[nDetailField][2][3]
+        aDetailDbStruct[nDetailField][DBS_LEN]:=aDetailCustomFields[nDetailField][2][1]
+        aDetailDbStruct[nDetailField][DBS_DEC]:=aDetailCustomFields[nDetailField][2][2]
+
+        //Obtem o X3_TITULO do Campo
+        if (empty(aDetailCustomFields[nDetailField][3]))
+            aDetailCustomFields[nDetailField][3]:=GetSX3Cache(aDetailCustomFields[nDetailField][1],"X3_TITULO")
+        endif
+        //Obtem o X3_PICTURE do Campo
+        if (empty(aDetailCustomFields[nDetailField][4]))
+            aDetailCustomFields[nDetailField][4]:=GetSX3Cache(aDetailCustomFields[nDetailField][1],"X3_PICTURE")
+        endif
+
+        //Obtem os Campos para a Query
+        cDetailQueryPutFields+=aDetailCustomFields[nDetailField][1]
+        cDetailQueryGetFields+=aDetailCustomFields[nDetailField][5]
+        if (nDetailField<nDetailFields)
+            cDetailQueryPutFields+=","
+            cDetailQueryGetFields+=","
+        endif
+
+        if (aDetailDbStruct[nDetailField][DBS_TYPE]!="M");//Se o campo nao for Memo,adiciona ao Indice e aa pesquisa
+
+            //Define o Campo como Indice
+            aAdd(aDetailFWMBQryIndex,{aDetailDbStruct[nDetailField][DBS_NAME]})
+
+            //Define o Campo como Filtrável
+            aAdd(aDetailFWMBrwFilter,;
+                {;
+                    aDetailCustomFields[nDetailField][1],;//Campo
+                    aDetailCustomFields[nDetailField][3],;//Título
+                    aDetailDbStruct[nDetailField][DBS_TYPE],;//Tipo de dado
+                    aDetailDbStruct[nDetailField][DBS_LEN],;//Tamanho
+                    aDetailDbStruct[nDetailField][DBS_DEC],;//Decimal
+                    aDetailCustomFields[nDetailField][4];//Picture
+                };
+            )
+
+            //Habilita o campo para Pesquisa
+            aAdd(aDetailFWMBrowseSeek,;
+                {;
+                    aDetailCustomFields[nDetailField][3],;//[n,1] Título da pesquisa
+                    {;
+                        {;
+                            GetSX3Cache(aDetailCustomFields[nDetailField][1],"X3_F3"),;//[n,2,n,1] LookUp (F3)
+                            aDetailDbStruct[nDetailField][DBS_TYPE],;//[n,2,n,2] Tipo de dados
+                            aDetailDbStruct[nDetailField][DBS_LEN],;//[n,2,n,3] Tamanho
+                            aDetailDbStruct[nDetailField][DBS_DEC],;//[n,2,n,4] Decimal
+                            aDetailCustomFields[nDetailField][3],;//[n,2,n,5] Título do campo
+                            aDetailCustomFields[nDetailField][4],;//[n,2,n,6] Máscara
+                            nil;//[n,2,n,7] Nome Físico do campo (Opcional) é ajustado no programa
+                        };
+                    },;
+                    nIndex++,;//[n,3] Ordem da pesquisa
+                    .T.;//[n,4] Exibe na pesquisa
+                };
+            )
+
+        endif
+
+        //Monta as Colunas do Browse
+        //Maiores detalhes, para FWBrwColumn, em: https://tdn.totvs.com/display/public/framework/FWBrwColumn
+        aAdd(aDetailFWMBrwColumn,FWBrwColumn():New())
+
+        aDetailFWMBrwColumn[nDetailField]:SetData(&("{|oSelf|(cBranchDetailAlias)->"+aDetailCustomFields[nDetailField][1]+"}"))
+
+        aDetailFWMBrwColumn[nDetailField]:SetTitle(aDetailCustomFields[nDetailField][3])
+        aDetailFWMBrwColumn[nDetailField]:SetPicture(aDetailCustomFields[nDetailField][4])
+        aDetailFWMBrwColumn[nDetailField]:SetSize(aDetailDbStruct[nDetailField][DBS_LEN])
+        aDetailFWMBrwColumn[nDetailField]:SetDecimal(aDetailDbStruct[nDetailField][DBS_DEC])
+
+    next nDetailField
+
+    //para maiores detalhes, acerca de FWTemporaryTable, consulte https://tdn.totvs.com/display/public/framework/FWTemporaryTable
+    oFWTemporaryTable:=FWTemporaryTable():New()
+    oFWTemporaryTable:SetFields(aDetailDbStruct)
+
+    nIndexes:=Len(aDetailFWMBQryIndex)
+    for nIndex:=1 to nIndexes
+        oFWTemporaryTable:AddIndex(StrZero(nIndex,3),aDetailFWMBQryIndex[nIndex])
+    next nIndex
+
+    oFWTemporaryTable:Create()
+
+    //Elabora a query para a obtenção dos registros
+    //para maiores detalhes, acerca de BEGINCONTENT...ENDCONTENT, consulte https://tdn.totvs.com/display/teces/BEGINCONTENT...ENDCONTENT
+    beginContent var cQuerySelect
+  SELECT cDetailQueryGetFields
+FROM
+    SF1010 SF1
+INNER JOIN
+    SA2010 SA2 ON (
+        SA2.D_E_L_E_T_=SA2.D_E_L_E_T_
+    AND SA2.A2_COD=SF1.F1_FORNECE
+    AND SA2.A2_FILIAL=(CASE SA2.A2_FILIAL WHEN ' ' THEN SA2.A2_FILIAL ELSE LEFT(SF1.F1_FILIAL,LEN(SA2.A2_FILIAL)) END)
+    )
+INNER JOIN
+    SD1010 SD1 ON (
+            SD1.D_E_L_E_T_=SF1.D_E_L_E_T_
+        AND SD1.D1_FILIAL=SF1.F1_FILIAL
+        AND SD1.D1_FORNECE=SF1.F1_FORNECE
+        AND SD1.D1_LOJA=SF1.F1_LOJA
+        AND SD1.D1_DOC=SF1.F1_DOC
+        AND SD1.D1_SERIE=SF1.F1_SERIE
+    )
+WHERE SF1.D_E_L_E_T_=' '
+  AND SF1.F1_FILIAL BETWEEN 'F1_FILIAL_DE' AND 'F1_FILIAL_ATE'
+  AND SF1.F1_STATUS=' '
+GROUP BY
+     SF1.F1_FILIAL
+    ,SF1.F1_FORNECE
+    ,SF1.F1_LOJA
+    ,SA2.A2_NOME
+    ,SF1.F1_DOC
+    ,SF1.F1_SERIE
+    ,SF1.F1_DTDIGIT
+    ,SF1.F1_EMISSAO
+    endContent
+
+    //Efetua a Substituição das constantes por Valores Dinamicos
+    cQuerySelect:=strTran(cQuerySelect,"cDetailQueryGetFields",cDetailQueryGetFields)
+    cQuerySelect:=strTran(cQuerySelect,"SA2010",RetSQLName("SA2"))
+    cQuerySelect:=strTran(cQuerySelect,"SF1010",RetSQLName("SF1"))
+    cQuerySelect:=strTran(cQuerySelect,"SD1010",RetSQLName("SD1"))
+
+    //para maiores detalhes, acerca de FWIsInCallStack, consulte https://tdn.totvs.com/display/public/framework/FWIsInCallStack
+    if (FWIsInCallStack("LF.LOADCOMPANYDETAIL"))
+        cQuerySelect:=strTran(cQuerySelect,"F1_FILIAL_DE",' ')
+        cQuerySelect:=strTran(cQuerySelect,"F1_FILIAL_ATE",'z')
+    else
+        cQuerySelect:=strTran(cQuerySelect,"F1_FILIAL_DE",(cDetailAlias)->F1_FILIAL)
+        cQuerySelect:=strTran(cQuerySelect,"F1_FILIAL_ATE",(cDetailAlias)->F1_FILIAL)
+    endif
+
+    //Elabora a Query para o Insert na Tabela Temporária
+    cBranchDetailTable:=oFWTemporaryTable:getRealName()
+    cQueryInsert:="INSERT INTO "+cBranchDetailTable
+    cQueryInsert+=" ("+cDetailQueryPutFields+") "
+    cQueryInsert+=cQuerySelect
+
+    cBranchDetailAlias:=oFWTemporaryTable:GetAlias()
+    dbSelectArea(cBranchDetailAlias)
+
+    //para maiores detalhes, acerca de CursorArrow, consulte https://tdn.totvs.com/display/tec/CursorArrow
+    CursorArrow()
+    //Executa o Insert..
+    //Para maiores detalhes, acerca de FWMsgRun, consulte https://tdn.totvs.com/display/public/framework/FWMsgRun
+    //Para maiores detalhes, acerca de TCSQLExec,consulte https://tdn.totvs.com/display/tec/TCSQLExec
+    FWMsgRun(nil,{||lQueryInsert:=(TCSQLExec(cQueryInsert)>=0)},"Aguarde...","Obtendo dados no SGBD")
+    //Muda o Ponteiro do Cursor
+    CursorWait()
+
+    //..Se nao Deu erro,Mostra os Dados do Monitor
+    if (lQueryInsert)
+
+        /* Define os Campos dos Totais que irão aparecer no Browse
+            aTotalCustomFields[n][1]=>Nome do Campo
+            aTotalCustomFields[n][2]=>TamSX3=>{Size,Dec,Type}
+            aTotalCustomFields[n][3]=>Título do Campo
+            aTotalCustomFields[n][4]=>Picture do Campo
+            aTotalCustomFields[n][5]=>Expressão SQL do Campo
+        */
+        aTotalCustomFields:={;
+            {"MSG_TOTAL",{100+GetSX3Cache("F1_FILIAL","X3_TAMANHO"),0,"C"},"","@!","'TOTAL DE NOTAS NÃO CLASSIFICADAS' AS MSG_TOTAL"},;//MSG_TOTAL
+            {"D1_TOTAL",TamSX3("D1_TOTAL"),"Valor Total das Notas",nil,"SUM(D1_TOTAL) AS D1_TOTAL"};//D1_TOTAL
+        }
+
+        //Processa cada Campo para a Elaboração do Browse
+        nTotalFields:=Len(aTotalCustomFields)
+        for nTotalField:=1 to nTotalFields
+
+            //Carrega a Estrutura da Tabela Temporaria
+            aAdd(aTotalDbStruct,Array(DBS_ALEN))
+            aTotalDbStruct[nTotalField][DBS_NAME]:=aTotalCustomFields[nTotalField][1]
+            aTotalDbStruct[nTotalField][DBS_TYPE]:=aTotalCustomFields[nTotalField][2][3]
+            aTotalDbStruct[nTotalField][DBS_LEN]:=aTotalCustomFields[nTotalField][2][1]
+            aTotalDbStruct[nTotalField][DBS_DEC]:=aTotalCustomFields[nTotalField][2][2]
+
+            //Obtem o X3_TITULO do Campo
+            if (aTotalCustomFields[nTotalField][3]==nil)
+                aTotalCustomFields[nTotalField][3]:=GetSX3Cache(aTotalCustomFields[nTotalField][1],"X3_TITULO")
+            endif
+            //Obtem o X3_PICTURE do Campo
+            if (aTotalCustomFields[nTotalField][4]==nil)
+                aTotalCustomFields[nTotalField][4]:=GetSX3Cache(aTotalCustomFields[nTotalField][1],"X3_PICTURE")
+            endif
+
+            //Obtem os Campos para a Query
+            cTotalQueryGetFields+=aTotalCustomFields[nTotalField][5]
+            if (nTotalField<nTotalFields)
+                cTotalQueryGetFields+=","
+            endif
+
+            //Monta as Colunas do Browse
+            //Maiores detalhes, para FWBrwColumn, em: https://tdn.totvs.com/display/public/framework/FWBrwColumn
+            aAdd(aTotalFWMBrwColumn,FWBrwColumn():New())
+
+            aTotalFWMBrwColumn[nTotalField]:SetData(&("{|oSelf|(cTotalAlias)->"+aTotalCustomFields[nTotalField][1]+"}"))
+
+            aTotalFWMBrwColumn[nTotalField]:SetTitle(aTotalCustomFields[nTotalField][3])
+            aTotalFWMBrwColumn[nTotalField]:SetPicture(aTotalCustomFields[nTotalField][4])
+            aTotalFWMBrwColumn[nTotalField]:SetSize(aTotalDbStruct[nTotalField][DBS_LEN])
+            aTotalFWMBrwColumn[nTotalField]:SetDecimal(aTotalDbStruct[nTotalField][DBS_DEC])
+
+        next nTotalField
+
+        //https://tdn.totvs.com/display/public/framework/Desenvolvendo+queries+no+Protheus
+        cTotalAlias:=getNextAlias()
+        cBranchDetailTable:="%"+cBranchDetailTable+"%"
+        cTotalQueryGetFields:="%"+cTotalQueryGetFields+"%"
+        beginSQL alias cTotalAlias
+            SELECT %exp:cTotalQueryGetFields%
+              FROM %exp:cBranchDetailTable%
+        endSQL
+
+        //https://tdn.totvs.com/display/public/framework/FWGetDialogSize
+        aFWGetDialogSizeCoors:=FWGetDialogSize()
+
+        //Define o Dialog
+        //Para maiores detalhes, acerca de FWDialogModal, consulte https://tdn.totvs.com/display/public/framework/FwDialogModal
+        oFWDialogModal:=FWDialogModal():New()
+        oFWDialogModal:SetTitle(cTitle)
+        oFWDialogModal:SetEscClose(.F.)
+        oFWDialogModal:SetSize(aFWGetDialogSizeCoors[3]/(2+if(lRedefineBottom,0/*.15*/,0)),aFWGetDialogSizeCoors[4]/2)
+        oFWDialogModal:CreateDialog()
+        oFWDialogModal:EnableFormBar(.T.)
+        oFWDialogModal:CreateFormBar()
+
+        //Libera os Arrays da memória
+        //Obs.: Função não documentada no TDS
+        FWFreeArray(@aFWGetDialogSizeCoors)
+
+        //Obtem o Panel vinculado ao Dialog
+        oPanelMain:=oFWDialogModal:GetPanelMain()
+
+        //Muda o Ponteiro do Cursor
+        CursorArrow()
+
+        //Obtem as Coordenadas da janela para a Distribuição das Grids Detalhes e Totais
+        //Para maiores detalhes, acerca de FWDefSize, consulte https://tdn.totvs.com/display/public/framework/FWDefSize
+        oFWDefSize:=FWDefSize():New(.F.,.F.)
+        oFWDefSize:AddObject("GRID_DETAIL",100,80,.T.,.T.)
+        oFWDefSize:AddObject("GRID_TOTAL",100,20,.T.,.T.)
+        oFWDefSize:lLateral:=.F.
+        oFWDefSize:lProp:=.T.
+        oFWDefSize:Process()
+
+        **********************************************************************************
+        *Detalhes
+        **********************************************************************************
+        nTop:=oFWDefSize:GetDimension("GRID_DETAIL","LININI")
+        nLeft:=oFWDefSize:GetDimension("GRID_DETAIL","COLINI")
+        nBottom:=oFWDefSize:GetDimension("GRID_DETAIL","LINEND")
+        nRight:=oFWDefSize:GetDimension("GRID_DETAIL","COLEND")
+        nRight-=5
+
+        //para maiores detalhes, acerca de TPanel, consulte https://tdn.totvs.com/display/tec/Construtor+TPanel%3ANew
+        oDetailTPanel:=TPanel():New(;
+            nTop/*[nRow]*/,;
+            nLeft/*[nCol]*/,;
+            /*[cText]*/,;
+            oPanelMain/*[oWnd]*/,;
+            /*[oFont]*/,;
+            /*[lCentered]*/,;
+            /*[uParam7]*/,;
+            /*[nClrText]*/,;
+            /*[nClrBack]*/,;
+            nRight/*[nWidth]*/,;
+            nBottom/*[nHeight]*/,;
+            /*[lLowered]*/,;
+            /*[lRaised]*/;
+        )
+
+        //Define o Browse de Detalhes
+        //Para maiores detalhes, acerca de FWMBrowse, consulte https://tdn.totvs.com/pages/releaseview.action?pageId=62390842
+        (cBranchDetailAlias)->(dbSetOrder(1))
+        (cBranchDetailAlias)->(dbGoTop())
+
+        cMenuDef:="LF.PRENOTAS.MVC"
+
+        oDetailFWMBrowse:=FWMBrowse():New()
+        oDetailFWMBrowse:SetDataTable()
+        oDetailFWMBrowse:SetTemporary(.T.)
+        oDetailFWMBrowse:SetAlias(cBranchDetailAlias)
+        oDetailFWMBrowse:SetMenuDef(cMenuDef)
+        oDetailFWMBrowse:SetColumns(aDetailFWMBrwColumn)
+        oDetailFWMBrowse:SetQueryIndex(aDetailFWMBQryIndex)
+        oDetailFWMBrowse:SetSeek(.T.,aDetailFWMBrowseSeek)
+        oDetailFWMBrowse:SetUseFilter(.T.)
+        oDetailFWMBrowse:SetUseCaseFilter(.T.)
+        oDetailFWMBrowse:SetFieldFilter(aDetailFWMBrwFilter)
+        oDetailFWMBrowse:DisableDetails()
+
+        bDetailLDblClick:={||ApMsgInfo("TODO: Implementar as visualização dos Detalhes",ProcName())}
+        oDetailFWMBrowse:SetDoubleClick(bDetailLDblClick)
+
+        bDetalRefreshUpdate:={||lReload:=.T.,oFWDialogModal:DeActivate(.T./*lFreeChildren*/)}
+        oDetailFWMBrowse:AddButton("Atualizar",bDetalRefreshUpdate,nil,2)
+        oDetailFWMBrowse:AddButton("Parâmetros",{||lf.PreNotas():LoadParameters(@jParameters),lReload:=.T.,oFWDialogModal:DeActivate(.T./*lFreeChildren*/)},nil,2)
+        oDetailFWMBrowse:AddButton("Fechar",{||oFWDialogModal:DeActivate(.T./*lFreeChildren*/)},nil,2)
+
+        oDetailFWMBrowse:AddButton("Detalhes",bDetailLDblClick,nil,1,0,.F.)
+        oDetailFWMBrowse:AddButton("Gráfico",{||ApMsgInfo("TODO: Implementar o Gráfico",ProcName())},nil,1,0,.F.)
+        oDetailFWMBrowse:AddButton("Excel",{||LoadBranchDetail2Excel(cBranchDetailAlias,aDetailCustomFields,cTitle)},nil,1,0,.F.)
+
+        **********************************************************************************
+        *Totais
+        **********************************************************************************
+        nTop:=oFWDefSize:GetDimension("GRID_TOTAL","LININI")
+        nLeft:=oFWDefSize:GetDimension("GRID_TOTAL","COLINI")
+        nBottom:=oFWDefSize:GetDimension("GRID_TOTAL","LINEND")
+        nRight:=oFWDefSize:GetDimension("GRID_TOTAL","COLEND")
+        nRight-=5
+
+        //para maiores detalhes, acerca de TPanel, consulte https://tdn.totvs.com/display/tec/Construtor+TPanel%3ANew
+        oTotalTPanel:=TPanel():New(;
+            nTop/*[nRow]*/,;
+            nLeft/*[nCol]*/,;
+            /*[cText]*/,;
+            oPanelMain/*[oWnd]*/,;
+            /*[oFont]*/,;
+            /*[lCentered]*/,;
+            /*[uParam7]*/,;
+            /*[nClrText]*/,;
+            /*[nClrBack]*/,;
+            nRight/*[nWidth]*/,;
+            nBottom/*[nHeight]*/,;
+            /*[lLowered]*/,;
+            /*[lRaised]*/;
+        )
+
+        //Define o Browse de Totais
+        //Para maiores detalhes, acerca de FWMBrowse, consulte https://tdn.totvs.com/pages/releaseview.action?pageId=62390842
+        oTotalFWMBrowse:=FWMBrowse():New()
+        oTotalFWMBrowse:SetDataTable()
+        oTotalFWMBrowse:SetTemporary(.T.)
+        oTotalFWMBrowse:SetAlias(cTotalAlias)
+        oTotalFWMBrowse:SetColumns(aTotalFWMBrwColumn)
+        oTotalFWMBrowse:DisableSeek()
+        oTotalFWMBrowse:DisableConfig()
+        oTotalFWMBrowse:DisableFilter()
+        oTotalFWMBrowse:DisableLocate()
+        oTotalFWMBrowse:DisableReport()
+        oTotalFWMBrowse:DisableDetails()
+        oTotalFWMBrowse:DisableSaveConfig()
+
+        bTotalLDblClick:={||{||ApMsgInfo("TODO: Implementar as visualização dos Detalhes Totais",ProcName())}}
+        oTotalFWMBrowse:SetDoubleClick(bTotalLDblClick)
+
+        **********************************************************************************
+        *Ativação dos Browsers
+        **********************************************************************************
+        //Seta oPanelMain como Owner do Browse de Detalhes
+        oDetailFWMBrowse:SetOwner(oDetailTPanel)
+
+        //Seta oPanelMain como Owner do Browse de Totais
+        oTotalFWMBrowse:SetOwner(oTotalTPanel)
+
+        //Aguarda a Preparação da Interface do Browse
+        FWMsgRun(nil,{||oDetailFWMBrowse:Activate(),oTotalFWMBrowse:Activate()},cTitle,"Ativando os Browses...")
+
+        //Ativa a Janela do Browse
+        oFWDialogModal:Activate()
+
+        //Encerra o Browse ao Sair do Activate do Dialog
+        oDetailFWMBrowse:DeActivate()
+
+        //Libera os objetos usados
+        aEval(aDetailFWMBrwColumn,{|o|FreeObj(@o)})
+        oDetailFWMBrowse:Destroy()
+
+        //Encerra o Browse ao Sair do Activate do Dialog
+        oTotalFWMBrowse:DeActivate()
+
+        //Libera os objetos usados
+        aEval(aTotalFWMBrwColumn,{|o|FreeObj(@o)})
+        oTotalFWMBrowse:Destroy()
+
+        //para maiores detalhes, acerca de FreeObj, consulte https://tdn.totvs.com/display/tec/FreeObj
+        FreeObj(@oFWDefSize)
+        FreeObj(@oPanelMain)
+        FreeObj(@oTotalTPanel)
+        FreeObj(@oDetailTPanel)
+        FreeObj(@oFWDialogModal)
+        FreeObj(@oTotalFWMBrowse)
+        FreeObj(@oDetailFWMBrowse)
+
+    else
+
+        //Na ocorrência de Erro, mostra a informação ao usuário
+        EecView(TCSQLError(),cTitle)
+
+    endif
+
+    //Encerra a Tabela Temporária
+    oFWTemporaryTable:delete()
+    FreeObj(@oFWTemporaryTable)
+
+    //Restaura os Ponteiros de Entrada
+    //para maiores detalhes, acerca de FWRestArea, consulte https://tdn.totvs.com/display/public/framework/FwRestArea
+    FWRestArea(@aArea)
+
+    //Libera os Arrays da memória
+    //Obs.: Função não documentada no TDS
+    FWFreeArray(@aArea)
+    FWFreeArray(@aTotalDbStruct)
+    FWFreeArray(@aDetailDbStruct)
+    FWFreeArray(@aTotalCustomFields)
+    FWFreeArray(@aDetailFWMBrwFilter)
+    FWFreeArray(@aDetailCustomFields)
+    FWFreeArray(@aDetailFWMBrwColumn)
+    FWFreeArray(@aDetailFWMBrowseSeek)
+    FWFreeArray(@aDetailFWMBQryIndex)
+
+    //Exclui todas classes de interface da thread.
+    //para maiores detalhes, acerca de DelClassIntf, consulte https://tdn.totvs.com/display/tec/DelClassIntf
+    DelClassIntf()
+
+    //Muda o Ponteiro do Cursor
+    CursorArrow()
+
+    if (lReload)
+        //Remonta o Browse
+        LoadBranchDetail(cDetailAlias,nDetailRecNo,cTitle)
+    endif
+
+return(nil)
+
+static function LoadBranchDetail2Excel(cBranchDetailAlias as character,aDetailCustomFields as array,cTitle as character) as logical
+
+    local aArea:=FWGetArea()
+    local aBranchDetailArea:=(cBranchDetailAlias)->(FWGetArea())
+
+    local aCells:=Array(0) as array
+    local aHeader as array
+    local aHeaderTitle as array
+
+    local cTipoRel:=cTitle as character
+    local cTipoRelNoAccent:=FwNoAccent(cTipoRel) as character
+
+    local cFile as character
+    local cFileTmp:=getTempPath() as character
+
+    local cColumn as character
+    local cField,cFieldType as character
+
+    local cWorkSheet:=cTitle as character
+    local cWBreak:=cWorkSheet as character
+    local cTBreak:=cWBreak as character
+
+    local cPicture as character
+
+    local lTotal:=.F. as logical
+    local lMsExcel as logical
+    local lExcelReport:=.F. as logical
+    local lExcelXlsx:=.F. as logical
+
+    local nField,nFields,nFieldAT as numeric
+
+    local nAlign as numeric
+    local nFormat as numeric
+
+    local oMsExcel as object
+    local oFWMSExcel as object
+
+    local uCell as variant
+
+    begin sequence
+
+        //Se não existirem informações para a geração da Planilha...
+        if (empty((cBranchDetailAlias)->(RecCount())))
+            //...Avisa ao usuário
+            ApMsgInfo("Não Existem dados a serem Exportados",ProcName())
+            //... e abandona
+            break
+        endif
+
+        //Garante o Posicionamento no Inicio da Tabela
+        (cBranchDetailAlias)->(dbGoTop())
+
+        //Elabora o Nome do Arquivo a ser Gerado
+        cFile:=ProcName()
+        cFile+="_"
+        cFile+=strTran(cTipoRelNoAccent," ","_")
+        cFile+="_"
+        cFile+=CriaTrab(nil,.F.)
+        cFile+=".xml"
+
+        cFile:=strTran(cFile,"::","_")
+        cFile:=strTran(cFile,"(","_")
+        cFile:=strTran(cFile,")","_")
+
+        //Verifica em qual formato deverá ser gerado .XLSX ou .XML
+        lExcelXlsx:=MsgYesNo("Gerar o arquivo no formato .XLSX?","EXCEL")
+
+        //Define a estrutura do Cabeçalho da Planilha
+        nFields:=Len(aDetailCustomFields)
+        aHeaderTitle:=array(0)
+        for nField:=1 to nFields
+            aAdd(aHeaderTitle,Array(4))
+            aHeaderTitle[nField][1]:=aDetailCustomFields[nField][1]
+            aHeaderTitle[nField][2]:=aDetailCustomFields[nField][3]
+            aHeaderTitle[nField][3]:=aDetailCustomFields[nField][2][3]
+            if (aHeaderTitle[nField][3]=="N")
+                aHeaderTitle[nField][4]:="__NOTRANSFORM__"
+            else
+                aHeaderTitle[nField][4]:=aDetailCustomFields[nField][4]
+            endif
+        next nField
+
+        nFields:=Len(aHeaderTitle)
+
+        for nField:=1 to nFields
+            nFieldAT:=nField
+            cField:=aHeaderTitle[nFieldAT][1]
+            if (empty(aHeaderTitle[nFieldAT][2]))
+                aHeaderTitle[nFieldAT][2]:=allTrim(GetSX3Cache(cField,"X3_TITULO"))
+            endif
+            if (empty(aHeaderTitle[nFieldAT][3]))
+                aHeaderTitle[nFieldAT][3]:=GetSX3Cache(cField,"X3_TIPO")
+            endif
+            if (aHeaderTitle[nFieldAT][4]!="__NOTRANSFORM__")
+                if empty(aHeaderTitle[nFieldAT][4])
+                    aHeaderTitle[nFieldAT][4]:=GetSX3Cache(cField,"X3_PICTURE")
+                endif
+            endif
+        next nField
+
+        //see: https://tdn.totvs.com/display/public/framework/FwPrinterXlsx
+        oFWMSExcel:=if(lExcelXlsx,FwMsExcelXlsx():New(),FWMsExcelEx():New())
+        oFWMSExcel:AddworkSheet(cWorkSheet)
+        oFWMSExcel:AddTable(cWBreak,cTBreak)
+
+        //Carrega o Cabeçalho da Planilha
+        aHeader:=(cBranchDetailAlias)->(dbStruct())
+        nFields:=Len(aHeader)
+
+        for nField:=1 to nFields
+            cField:=aHeader[nField][DBS_NAME]
+            nFieldAT:=aScan(aHeaderTitle,{|x|x[1]==cField})
+            cFieldType:=if(nFieldAT>0,aHeaderTitle[nFieldAT][3],aHeader[nField][DBS_TYPE])
+            if (empty(cFieldType))
+                cFieldType:=aHeader[nField][DBS_TYPE]
+            endif
+            nAlign:=if(cFieldType=="C",1,if(cFieldType=="N",3,2))
+            //1-General,2-Number,3-Monetario,4-DateTime
+            nFormat:=if(cFieldType=="D",4,if(cFieldType=="N",2,1))
+            cColumn:=if(nFieldAT>0,aHeaderTitle[nFieldAT][2],cField)
+            cColumn:=OemToAnsi(cColumn)
+            lTotal:=(cFieldType=="N")
+            oFWMSExcel:AddColumn(@cWBreak,@cTBreak,@cColumn,@nAlign,@nFormat,@lTotal)
+        next nField
+
+        //Carrega os Detalhes da Planilha
+        while ( (cBranchDetailAlias)->(!eof()) )
+
+            aSize(aCells,0)
+
+            for nField := 1 to nFields
+                uCell:=(cBranchDetailAlias)->(FieldGet(nField))
+                cField:=aHeader[nField][DBS_NAME]
+                nFieldAT:=aScan(aHeaderTitle,{|x|x[1]==cField})
+                cFieldType:=if(nFieldAT>0,aHeaderTitle[nFieldAT][3],aHeader[nField][DBS_TYPE])
+                if (empty(cFieldType))
+                    cFieldType:=aHeader[nField][DBS_TYPE]
+                endif
+                if (cFieldType=="D")
+                    if (cFieldType!=aHeader[nField][DBS_TYPE])
+                        uCell:=SToD(uCell)
+                    endif
+                endif
+                cPicture:=if(nFieldAT>0,aHeaderTitle[nFieldAT][4],"")
+                if (!(empty(cPicture)))
+                    if (!(cPicture=="__NOTRANSFORM__"))
+                        uCell:=allTrim(Transform(uCell,cPicture))
+                    endif
+                else
+                    if (cFieldType=="D")
+                        uCell:=DToC(uCell)
+                    endif
+                endif
+                aAdd(aCells,uCell)
+            next nField
+
+            oFWMSExcel:AddRow(@cWBreak,@cTBreak,aClone(aCells))
+
+            (cBranchDetailAlias)->(dbSkip())
+
+        end while
+
+        FWMsgRun(nil,{||oFWMSExcel:Activate(),oFWMSExcel:GetXMLFile(cFile),oFWMSExcel:DeActivate()},"Aguarde...","Obtendo Saida")
+
+        FWMsgRun(nil,{||lExcelReport:=CpyS2T(cFile,cFileTmp,.T.)},"Aguarde...","Copiando arquivo do Servidor")
+
+        if (!lExcelReport)
+            FWMsgRun(nil,{||lExcelReport:=__CopyFile(cFile,cFileTmp+cFile)},"Aguarde...","Copiando arquivo do Servidor")
+        endif
+
+        if (lExcelReport)
+
+            fErase(cFile)
+
+            cFileTmp+=cFile
+
+            lMsExcel:=ApOleClient("MsExcel")
+            if (lMsExcel)
+                oMsExcel:=MsExcel():New()
+                FWMsgRun(nil,{||oMsExcel:WorkBooks:Open(cFileTmp)},"Aguarde...","Carregando Arquivo Local")
+                oMsExcel:SetVisible(.T.)
+                oMsExcel:Destroy()
+                oMsExcel:=FreeObj(oMsExcel)
+            else
+                FWMsgRun(nil,{||ShellExecute("open",cFileTmp,"","",SW_SHOWMAXIMIZED)},"Aguarde...","Carregando Arquivo Local")
+            endif
+
+        endif
+
+    end sequence
+
+    FWRestArea(aBranchDetailArea)
+    FWRestArea(aArea)
+
+    FWFreeArray(@aBranchDetailArea)
+    FWFreeArray(@aArea)
+
+return(lExcelXlsx)
+
+static function LoadCompanyDetail(cDetailAlias as character,nDetailRecNo as numeric,cTitle as character) as variant
+return(LoadBranchDetail(@cDetailAlias,@nDetailRecNo,@cTitle))

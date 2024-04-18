@@ -438,7 +438,7 @@ GROUP BY
 
         cBranchDetailTitle:=if(Type("cCadastro")=="C",cCadastro,"Pré-Notas não Classificadas")
         cBranchDetailTitle+=" :: Detalhes da Filial"
-        bDetailLDblClick:={||LoadBranchDetail(cDetailAlias,(cDetailAlias)->(RecNo()),cBranchDetailTitle)}
+        bDetailLDblClick:={||LoadBranchDetail(cDetailAlias,(cDetailAlias)->(RecNo()),cBranchDetailTitle,.F.)}
         oDetailFWMBrowse:SetDoubleClick(bDetailLDblClick)
 
         bDetalRefreshUpdate:={||lReload:=.T.,oFWDialogModal:DeActivate(.T./*lFreeChildren*/)}
@@ -870,7 +870,7 @@ static function LoadChartFactoryOption() as numeric
 
 return(nChoice)
 
-static function LoadBranchDetail(cDetailAlias as character,nDetailRecNo as numeric,cTitle as character) as variant
+static function LoadBranchDetail(cDetailAlias as character,nDetailRecNo as numeric,cTitle as character,lLoadCompanyDetail as logical) as variant
 
     //para maiores detalhes, acerca de FWGetArea, consulte https://tdn.totvs.com/display/public/framework/FwGetArea
     local aArea:=FWGetArea() as array
@@ -894,6 +894,7 @@ static function LoadBranchDetail(cDetailAlias as character,nDetailRecNo as numer
     local cBranchDetailAlias,cTotalAlias as character
 
     local cBranchDetailTable as character
+    local cBranchDetailTitle as character
 
     local cQueryInsert as character
     local cQuerySelect as character
@@ -923,6 +924,16 @@ static function LoadBranchDetail(cDetailAlias as character,nDetailRecNo as numer
 
     //MsGoto, Semelhante a dbGoTo. Mas verifica se o registro já está posicionado antes de movimentar o Ponteiro.
     (cDetailAlias)->(MsGoTo(nDetailRecNo))
+
+    //Acrescenta a Filial ao Título
+    if (!lLoadCompanyDetail)
+        cTitle+=" :: "
+        cTitle+=(cDetailAlias)->F1_FILIAL
+        if ((cDetailAlias)->(FieldPos("M0_FILIAL"))>0)
+            cTitle+=" - "
+            cTitle+=(cDetailAlias)->M0_FILIAL
+        endif
+    endif
 
     //Muda o Ponteiro do Cursor
     //para maiores detalhes, acerca de CursorWait, consulte https://tdn.totvs.com/display/tec/CursorWait
@@ -1091,7 +1102,7 @@ GROUP BY
     endif
 
     //para maiores detalhes, acerca de FWIsInCallStack, consulte https://tdn.totvs.com/display/public/framework/FWIsInCallStack
-    if (FWIsInCallStack("LF.LOADCOMPANYDETAIL"))
+    if (lLoadCompanyDetail)
         cQuerySelect:=strTran(cQuerySelect,"F1_FILIAL_DE",' ')
         cQuerySelect:=strTran(cQuerySelect,"F1_FILIAL_ATE",'z')
     else
@@ -1259,7 +1270,14 @@ GROUP BY
         oDetailFWMBrowse:SetFieldFilter(aDetailFWMBrwFilter)
         oDetailFWMBrowse:DisableDetails()
 
-        bDetailLDblClick:={||ApMsgInfo("TODO: Implementar as visualização dos Detalhes",ProcName())}
+        if (lLoadCompanyDetail)
+            cBranchDetailTitle:=if(Type("cCadastro")=="C",cCadastro,"Pré-Notas não Classificadas")
+            cBranchDetailTitle+=" :: Detalhes da Filial"
+            bDetailLDblClick:={||LoadBranchDetail(cBranchDetailAlias,(cBranchDetailAlias)->(RecNo()),cBranchDetailTitle,.F.)}
+        else
+            bDetailLDblClick:={||ApMsgInfo("TODO: Implementar as visualização dos Detalhes",ProcName())}
+        endif
+
         oDetailFWMBrowse:SetDoubleClick(bDetailLDblClick)
 
         bDetalRefreshUpdate:={||lReload:=.T.,oFWDialogModal:DeActivate(.T./*lFreeChildren*/)}
@@ -1389,7 +1407,7 @@ GROUP BY
 
     if (lReload)
         //Remonta o Browse
-        LoadBranchDetail(cDetailAlias,nDetailRecNo,cTitle)
+        LoadBranchDetail(cDetailAlias,nDetailRecNo,cTitle,lLoadCompanyDetail)
     endif
 
 return(nil)
@@ -1594,4 +1612,4 @@ static function LoadBranchDetail2Excel(cBranchDetailAlias as character,aDetailCu
 return(lExcelXlsx)
 
 static function LoadCompanyDetail(cDetailAlias as character,nDetailRecNo as numeric,cTitle as character) as variant
-return(LoadBranchDetail(@cDetailAlias,@nDetailRecNo,@cTitle))
+return(LoadBranchDetail(@cDetailAlias,@nDetailRecNo,@cTitle,.T.))

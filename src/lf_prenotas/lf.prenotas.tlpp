@@ -935,7 +935,7 @@ static function LoadBranchDetail(cDetailAlias as character,nDetailRecNo as numer
         cTitle+=(cDetailAlias)->F1_FILIAL
         if ((cDetailAlias)->(FieldPos("M0_FILIAL"))>0)
             cTitle+=" - "
-            cTitle+=(cDetailAlias)->M0_FILIAL
+            cTitle+=allTrim((cDetailAlias)->M0_FILIAL)
         endif
     endif
 

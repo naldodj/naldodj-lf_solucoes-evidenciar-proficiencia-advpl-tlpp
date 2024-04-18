@@ -870,6 +870,9 @@ static function LoadChartFactoryOption() as numeric
 
 return(nChoice)
 
+static function LoadCompanyDetail(cDetailAlias as character,nDetailRecNo as numeric,cTitle as character) as variant
+return(LoadBranchDetail(@cDetailAlias,@nDetailRecNo,@cTitle,.T.))
+
 static function LoadBranchDetail(cDetailAlias as character,nDetailRecNo as numeric,cTitle as character,lLoadCompanyDetail as logical) as variant
 
     //para maiores detalhes, acerca de FWGetArea, consulte https://tdn.totvs.com/display/public/framework/FwGetArea
@@ -1611,6 +1614,3 @@ static function LoadBranchDetail2Excel(cBranchDetailAlias as character,aDetailCu
     FWFreeArray(@aArea)
 
 return(lExcelXlsx)
-
-static function LoadCompanyDetail(cDetailAlias as character,nDetailRecNo as numeric,cTitle as character) as variant
-return(LoadBranchDetail(@cDetailAlias,@nDetailRecNo,@cTitle,.T.))

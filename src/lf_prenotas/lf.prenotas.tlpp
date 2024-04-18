@@ -1,4 +1,5 @@
 /*******************************************************
+/*******************************************************
 * Nome do Arquivo: [lf.prenotas.tlpp]
 * Descrição: [Demostrar os conhecimentos de Marinaldo de Jesus em AdvPL/TLPP/SQL,etc. junto a clientes da LF Soluções]
 *
@@ -59,13 +60,6 @@ class PreNotas
     /*/
     //-------------------------------------------------------------------
     static method LoadParameters(jParameters as json) as logical
-
-    //-------------------------------------------------------------------
-    /*/{lf.prenotas.tlpp.doc} method LoadChartFactory
-    description método para carregar o Gráfico com as informações de Detalhes
-    /*/
-    //-------------------------------------------------------------------
-    static method LoadChartFactory(cTitle as character,cDetailAlias as character) as variant
 
 end class
 
@@ -453,7 +447,7 @@ GROUP BY
         oDetailFWMBrowse:AddButton("Fechar",{||oFWDialogModal:DeActivate(.T./*lFreeChildren*/)},nil,2)
 
         oDetailFWMBrowse:AddButton("Detalhes",bDetailLDblClick,nil,1,0,.F.)
-        oDetailFWMBrowse:AddButton("Gráfico",{||lf.PreNotas():LoadChartFactory(cTitle,cDetailAlias)},nil,1,0,.F.)
+        oDetailFWMBrowse:AddButton("Gráfico",{||LoadChartFactory(cTitle,cDetailAlias)},nil,1,0,.F.)
 
         **********************************************************************************
         *Totais
@@ -662,7 +656,12 @@ static method LoadParameters(jParameters) class PreNotas
 
 return(jParameters)
 
-static method LoadChartFactory(cTitle,cDetailAlias) class PreNotas
+//-------------------------------------------------------------------
+/*/{lf.prenotas.tlpp.doc} static function LoadChartFactory
+description função para carregar o Gráfico com as informações de Detalhes
+/*/
+//-------------------------------------------------------------------
+static function LoadChartFactory(cTitle as character,cDetailAlias as character) as variant
 
     local aArea as array
     local aAreaDetail as array
@@ -679,9 +678,6 @@ static method LoadChartFactory(cTitle,cDetailAlias) class PreNotas
     local oFWDialogModal as object
     local oFWChartFactory,oFWChartFactoryInstance as object
     local oFWChartFactoryTPanel as object
-
-    paramtype 1 var cTitle as character
-    paramtype 2 var cDetailAlias as character
 
     //Define o tipo de informação a ser mostrada no Gráfico
     nOptionChart:=LoadChartFactoryOption()
@@ -948,6 +944,7 @@ static function LoadBranchDetail(cDetailAlias as character,nDetailRecNo as numer
         {"F1_SERIE",TamSX3("F1_SERIE"),nil,nil,"SF1.F1_SERIE"},;//F1_SERIE
         {"F1_DTDIGIT",TamSX3("F1_DTDIGIT"),nil,nil,"SF1.F1_DTDIGIT"},;//F1_DTDIGIT
         {"F1_EMISSAO",TamSX3("F1_EMISSAO"),nil,nil,"SF1.F1_EMISSAO"},;//F1_EMISSAO
+        {"QTD_NOTAS",{6,0,"N"},"Qtde Notas",nil,"COUNT(*) AS QTD_NOTAS"},;//QTD_NOTAS
         {"D1_TOTAL",TamSX3("D1_TOTAL"),"Valor Documento",nil,"SUM(SD1.D1_TOTAL) AS D1_TOTAL"};//D1_TOTAL
     }
 
@@ -1132,6 +1129,7 @@ GROUP BY
         */
         aTotalCustomFields:={;
             {"MSG_TOTAL",{100+GetSX3Cache("F1_FILIAL","X3_TAMANHO"),0,"C"},"","@!","'TOTAL DE NOTAS NÃO CLASSIFICADAS' AS MSG_TOTAL"},;//MSG_TOTAL
+            {"QTD_NOTAS",{6,0,"N"},"Qtde Notas","999999","SUM(QTD_NOTAS) AS QTD_NOTAS"},;//QTD_NOTAS
             {"D1_TOTAL",TamSX3("D1_TOTAL"),"Valor Total das Notas",nil,"SUM(D1_TOTAL) AS D1_TOTAL"};//D1_TOTAL
         }
 

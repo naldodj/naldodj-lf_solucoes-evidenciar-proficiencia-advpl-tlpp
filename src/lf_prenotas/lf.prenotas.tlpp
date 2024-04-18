@@ -898,6 +898,7 @@ static function LoadBranchDetail(cDetailAlias as character,nDetailRecNo as numer
 
     local cQueryInsert as character
     local cQuerySelect as character
+    local cQuerySA2Filial as character
     local cTotalQueryGetFields:="" as character
     local cDetailQueryGetFields:="",cDetailQueryPutFields:="" as character
 
@@ -1050,6 +1051,14 @@ static function LoadBranchDetail(cDetailAlias as character,nDetailRecNo as numer
 
     oFWTemporaryTable:Create()
 
+    //Define o Filtro de Filiel
+	//para maiores detalhes, acerca de TCGetDb, consulte https://tdn.totvs.com/display/tec/TCGetDB
+	if ("ORACLE"$Upper(TCGetDb()))
+        cQuerySA2Filial:="SA2.A2_FILIAL=(CASE WHEN SA2.A2_FILIAL=' ' THEN SA2.A2_FILIAL ELSE SUBSTR(SF1.F1_FILIAL,1,LENGTH(SA2.A2_FILIAL)) END)"
+    else
+        cQuerySA2Filial:="SA2.A2_FILIAL=(CASE SA2.A2_FILIAL WHEN ' ' THEN SA2.A2_FILIAL ELSE LEFT(SF1.F1_FILIAL,LEN(SA2.A2_FILIAL)) END)"
+    endif
+
     //Elabora a query para a obtenção dos registros
     //para maiores detalhes, acerca de BEGINCONTENT...ENDCONTENT, consulte https://tdn.totvs.com/display/teces/BEGINCONTENT...ENDCONTENT
     beginContent var cQuerySelect
@@ -1060,7 +1069,7 @@ INNER JOIN
     SA2010 SA2 ON (
         SA2.D_E_L_E_T_=SA2.D_E_L_E_T_
     AND SA2.A2_COD=SF1.F1_FORNECE
-    AND SA2.A2_FILIAL=(CASE SA2.A2_FILIAL WHEN ' ' THEN SA2.A2_FILIAL ELSE LEFT(SF1.F1_FILIAL,LEN(SA2.A2_FILIAL)) END)
+    AND cQuerySA2Filial
     )
 INNER JOIN
     SD1010 SD1 ON (
@@ -1092,14 +1101,7 @@ GROUP BY
     cQuerySelect:=strTran(cQuerySelect,"SD1010",RetSQLName("SD1"))
 
     //Substitui o Filtro de Filial
-	//para maiores detalhes, acerca de TCGetDb, consulte https://tdn.totvs.com/display/tec/TCGetDB
-	if ("ORACLE"$Upper(TCGetDb()))
-        cQuerySelect:=strTran(;
-            cQuerySelect,;
-            "SA2.A2_FILIAL=(CASE SA2.A2_FILIAL WHEN ' ' THEN SA2.A2_FILIAL ELSE LEFT(SF1.F1_FILIAL,LEN(SA2.A2_FILIAL)) END)",;
-            "SA2.A2_FILIAL=(CASE WHEN SA2.A2_FILIAL=' ' THEN SA2.A2_FILIAL ELSE SUBSTR(SF1.F1_FILIAL,1,LENGTH(SA2.A2_FILIAL)) END)";
-        )
-    endif
+    cQuerySelect:=strTran(cQuerySelect,"cQuerySA2Filial",cQuerySA2Filial)
 
     //para maiores detalhes, acerca de FWIsInCallStack, consulte https://tdn.totvs.com/display/public/framework/FWIsInCallStack
     if (lLoadCompanyDetail)

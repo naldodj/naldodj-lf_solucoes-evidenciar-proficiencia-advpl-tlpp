@@ -1051,7 +1051,7 @@ static function LoadBranchDetail(cDetailAlias as character,nDetailRecNo as numer
 
     oFWTemporaryTable:Create()
 
-    //Define o Filtro de Filiel
+    //Define o Filtro de Filial
 	//para maiores detalhes, acerca de TCGetDb, consulte https://tdn.totvs.com/display/tec/TCGetDB
 	if ("ORACLE"$Upper(TCGetDb()))
         cQuerySA2Filial:="SA2.A2_FILIAL=(CASE WHEN SA2.A2_FILIAL=' ' THEN SA2.A2_FILIAL ELSE SUBSTR(SF1.F1_FILIAL,1,LENGTH(SA2.A2_FILIAL)) END)"

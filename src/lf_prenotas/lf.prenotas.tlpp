@@ -1103,7 +1103,6 @@ GROUP BY
     //Substitui o Filtro de Filial
     cQuerySelect:=strTran(cQuerySelect,"cQuerySA2Filial",cQuerySA2Filial)
 
-    //para maiores detalhes, acerca de FWIsInCallStack, consulte https://tdn.totvs.com/display/public/framework/FWIsInCallStack
     if (lLoadCompanyDetail)
         cQuerySelect:=strTran(cQuerySelect,"F1_FILIAL_DE",' ')
         cQuerySelect:=strTran(cQuerySelect,"F1_FILIAL_ATE",'z')
